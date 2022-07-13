@@ -12,6 +12,7 @@ from torch import optim
 from tqdm import tqdm
 import torch
 import os
+from tensorboardX import SummaryWriter
 
 
 class Trainer:
@@ -30,12 +31,11 @@ class Trainer:
 
         if not model_name: model_name = type(model).__name__
         self.model_name = model_name
-        if not os.path.exists(log_dir): os.mkdir(log_dir)
+        if not os.path.exists(log_dir): os.makedirs(log_dir)
         self.log_dir = log_dir
-        if not os.path.exists(os.path.join(save_path, model_name)): os.mkdir(os.path.join(save_path, model_name))
+        self.summary_writer = SummaryWriter(logdir=log_dir)
+        if not os.path.exists(os.path.join(save_path, model_name)): os.makedirs(os.path.join(save_path, model_name))
         self.save_path = save_path
-
-        self.loss_record = {'train': [], 'val': []}
 
     def train(self):
         min_loss = float('inf')
@@ -54,9 +54,9 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 loss = loss.detach().cpu().item()
-                self.loss_record['train'].append(loss)
+                self.summary_writer.add_scalar(tag='train/loss', scalar_value=loss)
             valid_loss = self.valid()
-            self.loss_record['val'].append(valid_loss)
+            self.summary_writer.add_scalar(tag='valid/loss', scalar_value=valid_loss)
 
             # save model
             is_save = valid_loss < min_loss

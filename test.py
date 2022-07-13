@@ -44,6 +44,6 @@ model = WideDeep(deep_features=wide_features, deep_features_conf=deep_features_c
 loss_func = BCELoss()
 
 trainer = Trainer(train_data=movie_data_train, val_data=movie_data_valid, model=model, max_epoch=100, device='cuda',
-                  loss_func=loss_func, early_stop=10, optimizer='SGD', optim_hparas={'lr': 0.0001})
+                  loss_func=loss_func, early_stop=10, optimizer='SGD', optim_hparas={'lr': 0.001})
 
 trainer.train()

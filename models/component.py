@@ -10,6 +10,7 @@
 """
 
 from torch.nn import Module, Linear, ReLU, Sequential, Embedding, ModuleList, ModuleDict
+import hashlib
 
 
 class MlpLayer(Module):
@@ -36,3 +37,33 @@ class FieldEmbedding(Module):
         out = self.embedding(x)
         out = out.sum(dim=1)
         return out
+
+
+class HashEmbedding(Module):
+    def __init__(self, bucket_size, embedding_dim):
+        super(HashEmbedding, self).__init__()
+        self.embedding = Embedding(num_embeddings=bucket_size, embedding_dim=embedding_dim)
+        self.bucket_size = bucket_size
+
+    def forward(self, x):
+        out = x.map_(x, self.hash_buckets)
+        out = self.embedding(out)
+        out = out.sum(dim=1)
+        return out
+
+    def hash_buckets(self, key, *karg):
+        md5 = hashlib.md5()
+        md5.update(str(key).encode('utf-8'))
+        hash_key = md5.hexdigest()
+        return int(hash_key, 16) % self.bucket_size
+
+
+def hash_buckets(key, bucket_size):
+    md5 = hashlib.md5()
+    md5.update(str(key).encode('utf-8'))
+    hash_key = md5.hexdigest()
+    return int(hash_key, 16) % bucket_size
+
+
+if __name__=="__main__":
+    print(hash_buckets(1246, bucket_size=10))
