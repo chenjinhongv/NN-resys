@@ -97,7 +97,7 @@ def hash_buckets(key, bucket_size):
     return int(hash_key, 16) % bucket_size
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # print(hash_buckets(1246, bucket_size=10))
     model = FmInteraction(left_feature_num=4, right_feature_num=6, factor_num=10)
     left_ids = torch.tensor([0, 1, 3], dtype=torch.int64)
@@ -106,3 +106,4 @@ if __name__=="__main__":
     right_vals = torch.tensor([[1, 1, .6, .7]])
     out = model(left_ids, left_vals, right_ids, right_vals)
     print(out)
+
