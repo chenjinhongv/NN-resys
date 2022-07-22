@@ -9,9 +9,14 @@
 # Description：
 """
 import torch
+from torch import Tensor
 from torch.nn import Module, Linear, ReLU, Sequential, Embedding, ModuleList, ModuleDict, Parameter
 from torch.nn.init import normal_
+
+import numpy as np
 import hashlib
+from typing import List, Union, Dict
+from utils.hash import HashFactory
 
 
 class FmInteraction(Module):
@@ -72,29 +77,61 @@ class FieldEmbedding(Module):
 
 
 class HashEmbedding(Module):
-    def __init__(self, bucket_size, embedding_dim):
+    def __init__(self, bucket_size: int, embedding_dim: int, hash_func: object = None):
         super(HashEmbedding, self).__init__()
         self.embedding = Embedding(num_embeddings=bucket_size, embedding_dim=embedding_dim)
         self.bucket_size = bucket_size
+        self.hash_func = hash_func if hash_func else self.hash_buckets
 
-    def forward(self, x):
-        out = x.map_(x, self.hash_buckets)
+    def forward(self, x: Tensor) -> Tensor:
+        out = x.map_(x, self.hash_func)
         out = self.embedding(out)
         out = out.sum(dim=1)
         return out
 
+    def set_hash_func(self, hash_func: object):
+        self.hash_func = hash_func
+
     def hash_buckets(self, key, *karg):
+        """
+        desc: default hash func
+        :param key:
+        :return:
+        """
         md5 = hashlib.md5()
         md5.update(str(key).encode('utf-8'))
         hash_key = md5.hexdigest()
         return int(hash_key, 16) % self.bucket_size
 
 
-def hash_buckets(key, bucket_size):
-    md5 = hashlib.md5()
-    md5.update(str(key).encode('utf-8'))
-    hash_key = md5.hexdigest()
-    return int(hash_key, 16) % bucket_size
+class MultiHashEmbedding(Module):
+    def __init__(self, bucket_size: int, embedding_dim: int, embedding_count: int):
+        super(MultiHashEmbedding, self).__init__()
+
+        self.bucket_size = bucket_size
+        self.a_list = Parameter(torch.tensor(np.random.choice(range(embedding_count*2), size=embedding_count, replace=False),
+                                             dtype=torch.float64))
+        self.b_list = Parameter(torch.tensor(np.random.choice(range(embedding_count*2), size=embedding_count, replace=False),
+                                             dtype=torch.float64))
+        # self.hash_funcs = [None] * embedding_count
+        self.hash_embedding_list = ModuleList([HashEmbedding(bucket_size=bucket_size, embedding_dim=embedding_dim) for _ in range(embedding_count)])
+        self._set_hash_funcs()
+
+    def load_state_dict(self, state_dict: Union[Dict[str, Tensor], Dict[str, Tensor]],
+                        strict: bool = True):
+        super(MultiHashEmbedding, self).load_state_dict(state_dict=state_dict, strict=strict)
+        self._set_hash_funcs()
+
+    def _set_hash_funcs(self):
+        hash_funcs = HashFactory(a_list=self.a_list, b_list=self.b_list, mod=self.bucket_size).get_hash_funcs()
+        for hash_embedding, hash_func in zip(self.hash_embedding_list, hash_funcs):
+            hash_embedding.set_hash_func(hash_func)
+
+    def forward(self, x: Tensor) -> List[Tensor]:
+        out = []
+        for hash_embedding in self.hash_embedding_list:
+            out.append(hash_embedding(x))
+        return out
 
 
 if __name__ == "__main__":
@@ -106,4 +143,12 @@ if __name__ == "__main__":
     right_vals = torch.tensor([[1, 1, .6, .7]])
     out = model(left_ids, left_vals, right_ids, right_vals)
     print(out)
+
+    model = MultiHashEmbedding(bucket_size=10, embedding_dim=14, embedding_count=3)
+    x1 = torch.randint(high=100, size=(3, 1))
+    x2 = torch.randint(high=100, size=(3, 4))
+    out1 = model(x1)
+    out2 = model(x2)
+    print(out1)
+    print(out2)
 

@@ -17,7 +17,7 @@ class Hash:
         self.b = b
         self.mod = mod
 
-    def __call__(self, key):
+    def __call__(self, key, *karg):
         return (self.a * key + self.b) % self.mod
 
 
