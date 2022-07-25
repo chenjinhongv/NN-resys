@@ -113,14 +113,18 @@ class Trainer:
 
     def valid(self):
         self.model.eval()
-        self.model.to('cpu')
+        self.model.to(self.device)
         all_pred = []
         all_y = []
         for x, y in tqdm(iter(self.val_data)):
+            for k in x:
+                x[k] = x[k].to(self.device)
+            y = y.to(self.device)
             pred = self.model(x)
             all_pred.append(pred)
             all_y.append(y)
         all_pred = torch.cat(all_pred, 0)
         all_y = torch.cat(all_y, 0)
         valid_loss = self.loss_func(all_pred, all_y)
+        valid_loss = valid_loss.cpu().item()
         return valid_loss
