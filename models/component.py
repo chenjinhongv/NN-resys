@@ -10,7 +10,7 @@
 """
 import torch
 from torch import Tensor
-from torch.nn import Module, Linear, ReLU, Sequential, Embedding, ModuleList, ModuleDict, Parameter
+from torch.nn import Module, Linear, ReLU, Sequential, Embedding, ModuleList, ModuleDict, Parameter, Sigmoid
 from torch.nn.init import normal_
 
 import numpy as np
@@ -134,6 +134,31 @@ class MultiHashEmbedding(Module):
         return out
 
 
+class SelfWeightedSummation(Module):
+    def __init__(self, input_dim=768, mlp_structure=[128, 64, 32]):
+        super(SelfWeightedSummation, self).__init__()
+        self.mlp_layer = MlpLayer(input_dim=input_dim, mlp_structure=mlp_structure)
+        self.linear = Linear(mlp_structure[-1], 1)
+        self.sigmoid = Sigmoid()
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        :param x: Tensor with shape of (batchsize, seq_len, embedding_dim)
+        :return: out: Tensor with shape of (batchsize, embedding_dim)
+        """
+        weights = []
+        for col in range(x.shape[1]):
+            weight = self.mlp_layer(x[:, col, :])
+            weight = self.linear(weight)
+            weight = self.sigmoid(weight)
+            weights.append(weight)
+        weights = torch.concat(weights, dim=1)
+        weights = weights.view((x.shape[0], 1, -1))
+        out = torch.bmm(weights, x)
+        out = out.view((x.shape[0], -1))
+        return out
+
+
 if __name__ == "__main__":
     # print(hash_buckets(1246, bucket_size=10))
     model = FmInteraction(left_feature_num=4, right_feature_num=6, factor_num=10)
@@ -152,3 +177,8 @@ if __name__ == "__main__":
     print(out1)
     print(out2)
 
+    model = SelfWeightedSummation()
+    x = torch.empty((12, 25, 768))
+    pred = model(x)
+    print(pred.shape)
+    print(pred)
