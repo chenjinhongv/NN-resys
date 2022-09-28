@@ -66,13 +66,21 @@ class MlpLayer(Module):
 
 
 class FieldEmbedding(Module):
-    def __init__(self, num_embeddings, embedding_dim):
+    def __init__(self, num_embeddings, embedding_dim, summation=None):
         super(FieldEmbedding, self).__init__()
         self.embedding = Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+        self.summation = summation
 
-    def forward(self, x):
-        out = self.embedding(x)
-        out = out.sum(dim=1)
+    def forward(self, key, val):
+        out = self.embedding(key)
+        val = val.unsqueeze(-1)
+        out = out
+        if self.summation == 'sum':
+            out = out.sum(dim=1)
+        elif self.summation == 'mean':
+            out = out.mean(dim=1)
+        elif self.summation == 'cat':
+            out = out.view((out.shape[0],-1))
         return out
 
 
@@ -152,11 +160,16 @@ class SelfWeightedSummation(Module):
             weight = self.linear(weight)
             weight = self.sigmoid(weight)
             weights.append(weight)
-        weights = torch.concat(weights, dim=1)
+        weights = torch.cat(weights, dim=1)
         weights = weights.view((x.shape[0], 1, -1))
         out = torch.bmm(weights, x)
         out = out.view((x.shape[0], -1))
         return out
+
+
+class DINActivateUnit(Module):
+    def __init__(self, embedding_dim):
+        pass
 
 
 if __name__ == "__main__":
@@ -182,3 +195,10 @@ if __name__ == "__main__":
     pred = model(x)
     print(pred.shape)
     print(pred)
+
+    model = FieldEmbedding(num_embeddings=10, embedding_dim=18, summation='cat')
+    key = torch.randint(high=10, size=(3, 4))
+    val = torch.ones(size=(3, 4))
+    out = model(key, val)
+    print(out.shape)
+    print(out)
